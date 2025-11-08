@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+DeepFunGen.py/backend/__pycache__/
+DeepFunGen.py/state/
+DeepFunGen.py/bin/
+*.zip
+*.7z
+*.rar
+
+# Release files (不要提交打包好的release文件)
+dist/
+build/
+*.exe
+DeepFunGen-*.zip
+DeepFunGen-*.7z
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+
