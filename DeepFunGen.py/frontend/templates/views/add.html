@@ -7,6 +7,10 @@
         <div class="pane__header-actions">
             <label for="model-select" class="label" data-i18n="add.model_label">Model</label>
             <select class="select" id="model-select"></select>
+            <label class="field field--inline">
+                <input class="checkbox" id="model-filter-vr" type="checkbox">
+                <span class="field__label" data-i18n="add.model_vr_only">VR models</span>
+            </label>
         </div>
     </header>
     <div class="pane__body">
@@ -16,6 +20,16 @@
                 <button class="button" id="btn-browse-files" data-i18n="add.browse_files">Browse Files</button>
             </div>
         </div>
+        <div class="manual-path">
+            <label class="field">
+                <span class="field__label" data-i18n="add.manual_path_label">Enter absolute path</span>
+                <div class="flex gap-sm">
+                    <input class="input" id="manual-path-input" type="text" placeholder="C:/videos/example.mp4" autocomplete="off">
+                    <button class="button" id="btn-add-manual-path" data-i18n="add.manual_path_button">Add Path</button>
+                </div>
+                <span class="text-muted small" data-i18n="add.manual_path_hint">Use this when file dialogs cannot expose the original path.</span>
+            </label>
+        </div>
         <div class="pane__content">
             <section class="options">
                 <header class="section-header">
@@ -23,47 +37,43 @@
                 </header>
                 <div class="options__grid">
                     <label class="field">
-                        <span class="field__label" data-i18n="queue.opt_smooth">Smooth Window</span>
+                        <span class="field__label" data-i18n="queue.opt_smooth" data-i18n-tooltip="add.tooltip.smooth">Smooth Window</span>
                         <input class="input" id="queue-opt-smooth" type="number" min="1" step="1" value="3">
                     </label>
                     <label class="field">
-                        <span class="field__label" data-i18n="queue.opt_prominence">Prominence Ratio</span>
+                        <span class="field__label" data-i18n="queue.opt_prominence" data-i18n-tooltip="add.tooltip.prominence">Prominence Ratio</span>
                         <input class="input" id="queue-opt-prominence" type="number" min="0" step="0.01" value="0.1">
                     </label>
                     <label class="field">
-                        <span class="field__label" data-i18n="add.opt_min_prominence">Min Prominence</span>
+                        <span class="field__label" data-i18n="add.opt_min_prominence" data-i18n-tooltip="add.tooltip.min_prominence">Min Prominence</span>
                         <input class="input" id="queue-opt-min-prominence" type="number" min="0" step="0.01" value="0.0">
                     </label>
                     <label class="field">
-                        <span class="field__label" data-i18n="add.opt_max_slope">Max Slope</span>
+                        <span class="field__label" data-i18n="add.opt_max_slope" data-i18n-tooltip="add.tooltip.max_slope">Max Slope</span>
                         <input class="input" id="queue-opt-max-slope" type="number" min="0" step="0.1" value="10">
                     </label>
                     <label class="field">
-                        <span class="field__label" data-i18n="add.opt_boost_slope">Boost Slope</span>
+                        <span class="field__label" data-i18n="add.opt_boost_slope" data-i18n-tooltip="add.tooltip.boost_slope">Boost Slope</span>
                         <input class="input" id="queue-opt-boost-slope" type="number" min="0" step="0.1" value="7">
                     </label>
                     <label class="field">
-                        <span class="field__label" data-i18n="add.opt_min_slope">Min Slope</span>
-                        <input class="input" id="queue-opt-min-slope" type="number" min="0" step="0.1" value="2">
+                        <span class="field__label" data-i18n="add.opt_min_slope" data-i18n-tooltip="add.tooltip.min_slope">Min Slope</span>
+                        <input class="input" id="queue-opt-min-slope" type="number" min="0" step="0.1" value="0">
                     </label>
                     <label class="field">
-                        <span class="field__label" data-i18n="queue.opt_merge">Merge Threshold (ms)</span>
+                        <span class="field__label" data-i18n="queue.opt_merge" data-i18n-tooltip="add.tooltip.merge">Merge Threshold (ms)</span>
                         <input class="input" id="queue-opt-merge" type="number" min="0" step="1" value="120">
-                    </label>
-                    <label class="field">
-                        <span class="field__label" data-i18n="add.opt_central_dev">Central Deviation Threshold</span>
-                        <input class="input" id="queue-opt-central-dev" type="number" min="0" step="0.01" value="0.03">
                     </label>
                     <label class="field field--inline">
                         <input class="checkbox" id="queue-opt-fft-denoise" type="checkbox" checked>
-                        <span class="field__label" data-i18n="add.opt_fft_denoise">FFT Denoise</span>
+                        <span class="field__label" data-i18n="add.opt_fft_denoise" data-i18n-tooltip="add.tooltip.fft_denoise">FFT Denoise</span>
                     </label>
                     <label class="field">
-                        <span class="field__label" data-i18n="add.opt_fft_frames">FFT Frames / Component</span>
+                        <span class="field__label" data-i18n="add.opt_fft_frames" data-i18n-tooltip="add.tooltip.fft_frames">FFT Frames / Component</span>
                         <input class="input" id="queue-opt-fft-frames" type="number" min="1" step="1" value="10">
                     </label>
                     <label class="field">
-                        <span class="field__label" data-i18n="add.opt_fft_window">FFT Window Frames</span>
+                        <span class="field__label" data-i18n="add.opt_fft_window" data-i18n-tooltip="add.tooltip.fft_window">FFT Window Frames</span>
                         <input class="input" id="queue-opt-fft-window" type="number" min="1" step="1" placeholder="Auto">
                     </label>
                 </div>

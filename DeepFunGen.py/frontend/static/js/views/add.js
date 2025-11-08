@@ -10,13 +10,17 @@ const PATH_SPLIT_REGEX = /[\/]/;
 const staged = new Map();
 let stagedList;
 let modelSelect;
+let modelFilterToggle;
 let addButton;
 let browseFilesButton;
 let dropZone;
+let manualPathInput;
+let manualPathButton;
 let htmlFileInput;
 
 const optionInputs = {};
 const trackedInputs = new WeakSet();
+let modelFilterVrOnly = false;
 
 const DEFAULT_OPTIONS = {
     smooth: 3,
@@ -24,9 +28,8 @@ const DEFAULT_OPTIONS = {
     minProminence: 0.0,
     maxSlope: 10.0,
     boostSlope: 7.0,
-    minSlope: 2.0,
+    minSlope: 0.0,
     merge: 120.0,
-    centralDeviation: 0.03,
     fftDenoise: true,
     fftFrames: 10,
 };
@@ -76,9 +79,12 @@ function registerOptionInput(key, elementId) {
 function ensureElements() {
     if (!stagedList) stagedList = document.getElementById('staged-items');
     if (!modelSelect) modelSelect = document.getElementById('model-select');
+    if (!modelFilterToggle) modelFilterToggle = document.getElementById('model-filter-vr');
     if (!addButton) addButton = document.getElementById('btn-add-to-queue');
     if (!browseFilesButton) browseFilesButton = document.getElementById('btn-browse-files');
     if (!dropZone) dropZone = document.getElementById('drop-zone');
+    if (!manualPathInput) manualPathInput = document.getElementById('manual-path-input');
+    if (!manualPathButton) manualPathButton = document.getElementById('btn-add-manual-path');
     registerOptionInput('smooth', 'queue-opt-smooth');
     registerOptionInput('prominence', 'queue-opt-prominence');
     registerOptionInput('minProminence', 'queue-opt-min-prominence');
@@ -86,7 +92,6 @@ function ensureElements() {
     registerOptionInput('boostSlope', 'queue-opt-boost-slope');
     registerOptionInput('minSlope', 'queue-opt-min-slope');
     registerOptionInput('merge', 'queue-opt-merge');
-    registerOptionInput('centralDeviation', 'queue-opt-central-dev');
     registerOptionInput('fftDenoise', 'queue-opt-fft-denoise');
     registerOptionInput('fftFrames', 'queue-opt-fft-frames');
     registerOptionInput('fftWindow', 'queue-opt-fft-window');
@@ -221,7 +226,6 @@ function applyDefaultOptions() {
     setNumeric(optionInputs.boostSlope, defaults.boost_slope, 'boostSlope');
     setNumeric(optionInputs.minSlope, defaults.min_slope, 'minSlope');
     setNumeric(optionInputs.merge, defaults.merge_threshold_ms, 'merge');
-    setNumeric(optionInputs.centralDeviation, defaults.central_deviation_threshold, 'centralDeviation');
     setBoolean(optionInputs.fftDenoise, defaults.fft_denoise, 'fftDenoise');
     setNumeric(optionInputs.fftFrames, defaults.fft_frames_per_component, 'fftFrames');
     setOptional(optionInputs.fftWindow, defaults.fft_window_frames);
@@ -343,9 +347,8 @@ function getPostprocessOptions() {
         min_prominence: getNumber(optionInputs.minProminence, 0.0),
         max_slope: getNumber(optionInputs.maxSlope, 10.0),
         boost_slope: getNumber(optionInputs.boostSlope, 7.0),
-        min_slope: getNumber(optionInputs.minSlope, 2.0),
+        min_slope: getNumber(optionInputs.minSlope, 0.0),
         merge_threshold_ms: getNumber(optionInputs.merge, 120.0),
-        central_deviation_threshold: getNumber(optionInputs.centralDeviation, 0.03),
         fft_denoise: optionInputs.fftDenoise ? Boolean(optionInputs.fftDenoise.checked) : true,
         fft_frames_per_component: Math.trunc(getNumber(optionInputs.fftFrames, 10)),
     };
@@ -356,30 +359,71 @@ function getPostprocessOptions() {
     return options;
 }
 
+function attachModelFilter() {
+    ensureElements();
+    if (!modelFilterToggle) return;
+    modelFilterToggle.checked = modelFilterVrOnly;
+    if (modelFilterToggle.dataset.filterBound) return;
+    modelFilterToggle.addEventListener('change', () => {
+        modelFilterVrOnly = Boolean(modelFilterToggle.checked);
+        renderModels(State.get('models') || []);
+    });
+    modelFilterToggle.dataset.filterBound = '1';
+}
+
+function isVrModel(model) {
+    if (!model) return false;
+    const identifier = String(model.display_name || model.name || model.path || '').toLowerCase();
+    return identifier.includes('vr');
+}
+
+function filterModels(models) {
+    if (!Array.isArray(models)) return [];
+    return models.filter((model) => {
+        const vr = isVrModel(model);
+        return modelFilterVrOnly ? vr : !vr;
+    });
+}
+
 function renderModels(models) {
     ensureElements();
+    if (modelFilterToggle) {
+        modelFilterToggle.checked = modelFilterVrOnly;
+    }
     if (!modelSelect) return;
     modelSelect.innerHTML = '';
-    if (!models || models.length === 0) {
+    const filtered = filterModels(models);
+    if (!filtered || filtered.length === 0) {
         const option = document.createElement('option');
         option.value = '';
-        option.textContent = 'No models found';
+        const emptyKey = modelFilterVrOnly ? 'add.no_models_vr' : 'add.no_models_non_vr';
+        option.dataset.i18n = emptyKey;
+        option.textContent = I18n.t(emptyKey);
         modelSelect.appendChild(option);
         modelSelect.disabled = true;
         addButton?.setAttribute('disabled', 'disabled');
+        renderStagedItems();
         return;
     }
     modelSelect.disabled = false;
     addButton?.removeAttribute('disabled');
-    models.forEach((model) => {
+    filtered.forEach((model) => {
         const option = document.createElement('option');
         option.value = model.path;
         option.textContent = model.display_name || model.name || model.path;
         modelSelect.appendChild(option);
     });
     const defaultModel = State.get('settings')?.default_model_path;
-    if (defaultModel) {
-        modelSelect.value = defaultModel;
+    const preferredPath = filtered.some((model) => model.path === defaultModel)
+        ? defaultModel
+        : filtered[0]?.path;
+    if (preferredPath) {
+        modelSelect.value = preferredPath;
+        if (modelSelect.value !== preferredPath) {
+            modelSelect.selectedIndex = 0;
+        }
+    } else {
+        modelSelect.selectedIndex = 0;
     }
     renderStagedItems();
 }
@@ -437,6 +481,56 @@ function attachFilePickers() {
     }
 }
 
+function submitManualPath() {
+    ensureElements();
+    if (!manualPathInput) return;
+    const raw = manualPathInput.value.trim();
+    if (!raw) {
+        showToast(I18n.t('add.toast_enter_path'), 'info');
+        manualPathInput.focus();
+        return;
+    }
+    const key = normaliseKey(raw);
+    const duplicate = staged.has(key);
+    const supported = isSupportedVideo(raw);
+    if (!supported) {
+        toast('unsupported', 'Unsupported file type.', 'error');
+        manualPathInput.focus();
+        return;
+    }
+    if (duplicate) {
+        toast('drop_skipped', 'No new files were staged.', 'info');
+        manualPathInput.focus();
+        return;
+    }
+    const added = stagePaths([raw]);
+    if (added > 0) {
+        manualPathInput.value = '';
+        manualPathInput.focus();
+        return;
+    }
+    toast('drop_skipped', 'No new files were staged.', 'info');
+    manualPathInput.focus();
+}
+
+function attachManualPathInput() {
+    ensureElements();
+    if (manualPathButton) {
+        manualPathButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            submitManualPath();
+        });
+    }
+    if (manualPathInput) {
+        manualPathInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                submitManualPath();
+            }
+        });
+    }
+}
+
 function attachDropZone() {
     ensureElements();
     if (!dropZone) return;
@@ -475,7 +569,9 @@ function subscribeState() {
 export const AddView = {
     init() {
         ensureElements();
+        attachModelFilter();
         attachFilePickers();
+        attachManualPathInput();
         attachDropZone();
         addButton?.addEventListener('click', enqueueFiles);
         subscribeState();
@@ -514,6 +610,7 @@ function ensureHtmlPicker() {
         const paths = [];
         const missingPaths = [];
         files.forEach((file) => {
+            console.log(file);
             const path = typeof file?.path === 'string' && file.path ? file.path : null;
             if (path) {
                 paths.push(path);
@@ -521,6 +618,7 @@ function ensureHtmlPicker() {
                 missingPaths.push(file.name);
             }
         });
+        console.log({ paths, missingPaths });
         const added = stagePaths(paths);
         if (missingPaths.length) {
             toast('browser_no_path', 'Browser security blocks access to file paths. Please use the desktop app.', 'error');
@@ -543,4 +641,3 @@ function openHtmlFilePicker() {
     input.value = '';
     input.click();
 }
-
