@@ -59,71 +59,57 @@ DeepFunGen은 ONNX 포맷의 간섭도 예측 모델을 사용해 비디오를 �
 
 ---
 
-## 发布流程 (Release Process)
+# DeepFunGen 快速开始
 
-### 使用 PyInstaller 打包
+**DeepFunGen** 是一个基于 Windows 的 Python 应用程序，使用 ONNX 格式的推理模型对视频进行后台推理和后处理。  
+按照以下步骤快速设置、运行并查看结果。
 
-#### 安装 PyInstaller
-```bash
-cd DeepFunGen.py
-uv add --dev pyinstaller
-```
+## 系统要求
+- Windows 10 或 11
+- [uv](https://github.com/astral-sh/uv)
+- `models/` 文件夹中有一个或多个 ONNX 模型（默认包含 `conv_tcn_56.onnx`）
 
-#### 创建打包脚本 `build_release.py`
-```python
-import PyInstaller.__main__
-import shutil
-from pathlib import Path
+## 运行方法
+1. 运行 `run.bat`。  
+   这将通过 **uv** 自动安装依赖并启动应用程序。
+2. **添加文件界面**
+   - 默认情况下，启动时会选择模型 `models/conv_tcn_56.onnx`。  
+     要切换到其他模型，请从右侧下拉菜单中选择不同的 ONNX 文件。
+   - 拖放视频文件（如 `.mp4`）或点击 **浏览文件** 来添加它们。
+   - 根据需要调整选项，然后点击 **加入队列** 将视频加入处理队列。
+3. **队列界面**
+   - 在此处监控处理进度。
+   - 推理完成后，预测结果将保存为 `<视频名称>.<模型名称>.csv`，并在同一文件夹中生成 `<视频名称>.funscript` 文件。
+   - 如果重新添加之前处理过的视频，将重用保存的 CSV 文件以节省重新处理时间。
+   - 在队列中选择一个项目，然后点击 **打开查看器** 启动查看器并可视化分步图表。
 
-# 清理之前的构建
-for dir_name in ['build', 'dist']:
-    if Path(dir_name).exists():
-        shutil.rmtree(dir_name)
+## 模型管理与加速
+- 放置在 `models/` 文件夹中的任何 ONNX 模型都会自动出现在下拉列表中。
+- 如果您的 GPU 支持 **DirectML (DirectX 12)**，将自动启用硬件加速；否则，应用程序将回退到 CPU 执行。  
+  您可以在底部的 **Provider** 部分查看当前使用的执行引擎。
 
-# PyInstaller 配置（推荐使用 onedir 模式）
-PyInstaller.__main__.run([
-    'main.py',
-    '--name=DeepFunGen',
-    '--windowed',  # 无控制台窗口
-    '--onedir',  # 文件夹模式（更稳定）
-    '--icon=frontend/icon.png',  # 如果有图标
-    '--add-data=frontend;frontend',  # 包含前端文件
-    '--add-data=models;models',  # 包含模型文件
-    '--hidden-import=webview',
-    '--hidden-import=uvicorn',
-    '--hidden-import=fastapi',
-    '--collect-all=webview',
-    '--noconfirm',
-    '--clean',
-])
-```
+## 主要特点
 
-#### 执行打包
-```bash
-python build_release.py
-```
+### 🌐 多语言支持
+- **中文界面**：完整的中文界面支持，操作更便捷
+- **多语言切换**：支持英语、韩语、中文三种语言，可在设置中自由切换
+- **国际化设计**：所有界面文本均支持多语言
 
-打包后的文件会在 `dist/DeepFunGen/` 目录中。
+### 🚀 高性能处理
+- **GPU 加速**：自动检测并使用 DirectML (DirectX 12) 进行硬件加速
+- **后台处理**：支持队列管理，可批量处理多个视频
+- **智能缓存**：自动重用已处理的结果，节省重复处理时间
 
-### 创建 GitHub Release
+### 📊 可视化分析
+- **实时进度**：队列界面实时显示处理状态和进度
+- **结果查看器**：可视化预测结果的分步图表
+- **详细统计**：显示预处理、推理、预计时间等详细信息
 
-#### 步骤 1：创建标签
-```bash
-git tag -a v1.2.0 -m "Release version 1.2.0 with Chinese localization"
-git push origin v1.2.0
-```
+### 🎯 灵活配置
+- **多模型支持**：轻松切换不同的 ONNX 模型
+- **处理选项**：可配置平滑窗口、峰值检测、FFT 降噪等参数
+- **VR 模型**：支持 VR 专用模型的筛选和选择
 
-#### 步骤 2：在 GitHub 上创建 Release
-1. 进入仓库页面
-2. 点击 "Releases" → "Draft a new release"
-3. 选择标签 `v1.2.0`
-4. 填写发布标题和说明
-5. 上传打包好的文件（压缩成 zip）
+---
 
-### 打包注意事项
-
-- **模型文件**：确保 `models/` 目录中的 ONNX 模型文件被正确包含
-- **前端资源**：确保所有前端文件（HTML、CSS、JS）都被包含
-- **依赖库**：PyInstaller 会自动检测大部分依赖，但某些动态导入的模块可能需要手动指定
-- **测试**：打包后务必在干净的 Windows 系统上测试
-- **文件大小**：推荐使用 `--onedir` 模式（文件夹模式），启动更快更稳定
+_DeepFunGen 旨在使基于 ONNX 的功能信号生成和推理管道变得简单、高效且易于可视化。_
