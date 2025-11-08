@@ -56,3 +56,74 @@ DeepFunGen은 ONNX 포맷의 간섭도 예측 모델을 사용해 비디오를 �
 ## 모델 교체 & 가속
 - ONNX 모델은 `models/` 폴더에 넣으면 자동으로 드롭다운에 표시됩니다.
 - GPU가 DirectML(DirectX 12)를 지원하면 자동으로 가속을 사용하며, 지원하지 않을 경우 CPU로 폴백됩니다. 하단의 Provider에서 현재 사용 중인 실행 프로바이더를 확인할 수 있습니다.
+
+---
+
+## 发布流程 (Release Process)
+
+### 使用 PyInstaller 打包
+
+#### 安装 PyInstaller
+```bash
+cd DeepFunGen.py
+uv add --dev pyinstaller
+```
+
+#### 创建打包脚本 `build_release.py`
+```python
+import PyInstaller.__main__
+import shutil
+from pathlib import Path
+
+# 清理之前的构建
+for dir_name in ['build', 'dist']:
+    if Path(dir_name).exists():
+        shutil.rmtree(dir_name)
+
+# PyInstaller 配置（推荐使用 onedir 模式）
+PyInstaller.__main__.run([
+    'main.py',
+    '--name=DeepFunGen',
+    '--windowed',  # 无控制台窗口
+    '--onedir',  # 文件夹模式（更稳定）
+    '--icon=frontend/icon.png',  # 如果有图标
+    '--add-data=frontend;frontend',  # 包含前端文件
+    '--add-data=models;models',  # 包含模型文件
+    '--hidden-import=webview',
+    '--hidden-import=uvicorn',
+    '--hidden-import=fastapi',
+    '--collect-all=webview',
+    '--noconfirm',
+    '--clean',
+])
+```
+
+#### 执行打包
+```bash
+python build_release.py
+```
+
+打包后的文件会在 `dist/DeepFunGen/` 目录中。
+
+### 创建 GitHub Release
+
+#### 步骤 1：创建标签
+```bash
+git tag -a v1.2.0 -m "Release version 1.2.0 with Chinese localization"
+git push origin v1.2.0
+```
+
+#### 步骤 2：在 GitHub 上创建 Release
+1. 进入仓库页面
+2. 点击 "Releases" → "Draft a new release"
+3. 选择标签 `v1.2.0`
+4. 填写发布标题和说明
+5. 上传打包好的文件（压缩成 zip）
+
+### 打包注意事项
+
+- **模型文件**：确保 `models/` 目录中的 ONNX 模型文件被正确包含
+- **前端资源**：确保所有前端文件（HTML、CSS、JS）都被包含
+- **依赖库**：PyInstaller 会自动检测大部分依赖，但某些动态导入的模块可能需要手动指定
+- **测试**：打包后务必在干净的 Windows 系统上测试
+- **文件大小**：推荐使用 `--onedir` 模式（文件夹模式），启动更快更稳定
