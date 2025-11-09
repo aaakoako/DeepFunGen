@@ -44,6 +44,12 @@ DeepFunGen-*.7z
 DeepFunGen/bin/
 DeepFunGen/obj/
 
+# Test scripts (本地测试脚本，不提交)
+full_pipeline_test.py
+regenerate_wowgirls.py
+compare_wowgirls_regenerated.py
+analyze_motion_vs_bgm.py
+
 # Test scripts output (保留脚本，但忽略输出)
 *_test_results/
 *_comparison_report.md
