@@ -111,17 +111,18 @@ def recommend_by_frequency(features: Dict[str, float]) -> Dict[str, float]:
     # Analysis shows: manual scripts have 97.1% intervals <200ms, avg 131.4ms
     # Tool-generated: only 8.8% intervals <200ms, avg 354.8ms (65.3% in 200-400ms range)
     # 400ms threshold is too high, causing precision loss and delay
-    # Need precision-focused range: 150-300ms to preserve more detail and improve accuracy
+    # Original author's default: 120ms (models.py, postprocessor.py)
+    # Need precision-focused range: 100-200ms to match original default and improve accuracy
     # This is the KEY parameter to match frequency AND improve precision
-    # Continuous mapping: 150ms (high freq, high precision) to 300ms (low freq, lower precision)
+    # Continuous mapping: 100ms (high freq, high precision) to 200ms (low freq, lower precision)
     if period_length > 0:
         # Convert period length (in frames) to milliseconds (assuming 30fps)
         period_ms = (period_length / 30.0) * 1000.0
-        # Use period-based calculation with precision-focused range: 150-300ms
-        merge_threshold_ms = max(150.0, min(300.0, period_ms * 0.15))  # Precision-focused multiplier
+        # Use period-based calculation with precision-focused range: 100-200ms (aligned with original default 120ms)
+        merge_threshold_ms = max(100.0, min(200.0, period_ms * 0.1))  # Precision-focused multiplier
     else:
-        # Continuous mapping based on frequency: 150ms (high freq) to 300ms (low freq)
-        merge_threshold_ms = 150.0 + (300.0 - 150.0) * (1.0 - freq_normalized)
+        # Continuous mapping based on frequency: 100ms (high freq) to 200ms (low freq)
+        merge_threshold_ms = 100.0 + (200.0 - 100.0) * (1.0 - freq_normalized)
     
     # prominence_ratio: adjust based on extrema density (continuous mapping)
     # This is KEY to reduce action density and filter small fluctuations
