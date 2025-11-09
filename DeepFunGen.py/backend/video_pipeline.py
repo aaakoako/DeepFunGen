@@ -163,10 +163,174 @@ def process_video(
     )
 
 
+def quick_predict_for_recommendation(
+    video_path: Path,
+    model: OnnxSequenceModel,
+    *,
+    frames_per_segment: int = 250,
+) -> pd.DataFrame:
+    """
+    Perform quick prediction on selected video segments for parameter recommendation.
+    
+    This function intelligently samples video segments based on total frame count
+    to get representative signal data without processing the entire video.
+    
+    Args:
+        video_path: Path to video file
+        model: OnnxSequenceModel instance
+        frames_per_segment: Number of frames to sample per segment (default 250)
+        
+    Returns:
+        DataFrame with frame_index, timestamp_ms, and predicted_change columns
+    """
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise RuntimeError(f"Unable to open video: {video_path}")
+    
+    fps = float(cap.get(cv2.CAP_PROP_FPS))
+    if fps <= 1e-3:
+        fps = 30.0
+    
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if total_frames <= 0:
+        # If frame count is unknown, process a small sample
+        total_frames = 1000
+        cap.release()
+        raise RuntimeError("Cannot determine video frame count")
+    
+    # Calculate number of segments based on total frames
+    if total_frames < 5000:  # < 3 minutes @ 30fps
+        num_segments = 2
+    elif total_frames < 20000:  # 3-11 minutes
+        num_segments = 4
+    elif total_frames < 60000:  # 11-33 minutes
+        num_segments = 6
+    else:  # > 33 minutes
+        num_segments = 10
+    
+    # Adjust frames_per_segment for very short videos
+    if total_frames < frames_per_segment * num_segments:
+        frames_per_segment = max(100, total_frames // (num_segments + 1))
+    
+    # Select representative segments
+    segments = _select_representative_segments(total_frames, num_segments, frames_per_segment)
+    
+    per_frame_shape = (model.HEIGHT, model.WIDTH, model.CHANNELS)
+    window = deque(maxlen=model.SEQUENCE_LENGTH)
+    all_predictions = []
+    frame_ms = 1000.0 / fps
+    
+    try:
+        for seg_start, seg_end in segments:
+            # Seek to segment start
+            cap.set(cv2.CAP_PROP_POS_FRAMES, seg_start)
+            
+            segment_predictions = []
+            local_frame_idx = 0
+            
+            while local_frame_idx < (seg_end - seg_start):
+                ret, frame = cap.read()
+                if not ret or frame is None:
+                    break
+                if frame.size == 0:
+                    continue
+                
+                global_frame_idx = seg_start + local_frame_idx
+                
+                resized = cv2.resize(frame, (model.WIDTH, model.HEIGHT), interpolation=cv2.INTER_AREA)
+                rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
+                normalized = rgb.astype(np.float32) / 255.0
+                
+                if normalized.shape != per_frame_shape:
+                    normalized = normalized.reshape(per_frame_shape)
+                
+                window.append(normalized)
+                
+                predicted_value = 0.0
+                if len(window) == model.SEQUENCE_LENGTH:
+                    sequence = np.stack(window, axis=0)
+                    predicted_value = model.infer(sequence)
+                
+                timestamp_ms = global_frame_idx * frame_ms
+                segment_predictions.append({
+                    "frame_index": global_frame_idx,
+                    "timestamp_ms": timestamp_ms,
+                    "predicted_change": predicted_value,
+                })
+                
+                local_frame_idx += 1
+            
+            all_predictions.extend(segment_predictions)
+    finally:
+        cap.release()
+    
+    if not all_predictions:
+        raise RuntimeError("No frames processed from video segments")
+    
+    # Create DataFrame from all predictions
+    df = pd.DataFrame(all_predictions)
+    df = df.sort_values("frame_index").reset_index(drop=True)
+    
+    return df
+
+
+def _select_representative_segments(
+    total_frames: int,
+    num_segments: int,
+    frames_per_segment: int,
+) -> list[tuple[int, int]]:
+    """
+    Select representative video segments for sampling.
+    
+    Args:
+        total_frames: Total number of frames in video
+        num_segments: Number of segments to sample
+        frames_per_segment: Frames to sample per segment
+        
+    Returns:
+        List of (start_frame, end_frame) tuples
+    """
+    segments = []
+    
+    if num_segments == 1:
+        # Single segment from middle
+        start = max(0, (total_frames - frames_per_segment) // 2)
+        end = min(total_frames, start + frames_per_segment)
+        segments.append((start, end))
+    elif num_segments == 2:
+        # Beginning and end
+        segments.append((0, min(frames_per_segment, total_frames)))
+        segments.append((max(0, total_frames - frames_per_segment), total_frames))
+    else:
+        # Distribute segments across video
+        # Always include beginning and end
+        segments.append((0, min(frames_per_segment, total_frames)))
+        
+        # Distribute middle segments
+        if num_segments > 2:
+            step = total_frames / (num_segments - 1)
+            for i in range(1, num_segments - 1):
+                center = int(i * step)
+                start = max(0, center - frames_per_segment // 2)
+                end = min(total_frames, start + frames_per_segment)
+                if end > start:
+                    segments.append((start, end))
+        
+        # End segment
+        if num_segments > 1:
+            segments.append((max(0, total_frames - frames_per_segment), total_frames))
+    
+    # Remove overlapping segments and ensure they're sorted
+    segments = sorted(set(segments), key=lambda x: x[0])
+    
+    return segments
+
+
 __all__ = [
     "PipelineResult",
     "ProcessingCancelled",
     "process_video",
+    "quick_predict_for_recommendation",
     "resolve_prediction_path",
     "resolve_script_path",
 ]

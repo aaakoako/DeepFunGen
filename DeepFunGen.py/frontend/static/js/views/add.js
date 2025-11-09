@@ -17,10 +17,12 @@ let dropZone;
 let manualPathInput;
 let manualPathButton;
 let htmlFileInput;
+let recommendButton;
 
 const optionInputs = {};
 const trackedInputs = new WeakSet();
 let modelFilterVrOnly = false;
+let recommendedValues = {};
 
 const DEFAULT_OPTIONS = {
     smooth: 3,
@@ -85,6 +87,7 @@ function ensureElements() {
     if (!dropZone) dropZone = document.getElementById('drop-zone');
     if (!manualPathInput) manualPathInput = document.getElementById('manual-path-input');
     if (!manualPathButton) manualPathButton = document.getElementById('btn-add-manual-path');
+    if (!recommendButton) recommendButton = document.getElementById('btn-recommend-parameters');
     registerOptionInput('smooth', 'queue-opt-smooth');
     registerOptionInput('prominence', 'queue-opt-prominence');
     registerOptionInput('minProminence', 'queue-opt-min-prominence');
@@ -566,6 +569,262 @@ function subscribeState() {
     });
 }
 
+async function recommendParameters() {
+    ensureElements();
+    if (staged.size === 0) {
+        showToast(I18n.t('add.recommend_no_video'), 'error');
+        return;
+    }
+    if (!modelSelect?.value) {
+        showToast(I18n.t('add.recommend_no_model'), 'error');
+        return;
+    }
+    
+    // Get first staged video
+    const firstVideo = Array.from(staged.values())[0];
+    if (!firstVideo) {
+        showToast(I18n.t('add.recommend_no_video'), 'error');
+        return;
+    }
+    
+    if (recommendButton) {
+        recommendButton.disabled = true;
+        recommendButton.textContent = I18n.t('add.recommend_analyzing');
+    }
+    
+    try {
+        const payload = {
+            video_path: firstVideo.path,
+            model_path: modelSelect.value,
+        };
+        const response = await Api.post('/api/recommend-parameters', payload);
+        
+        if (response && response.recommended_options) {
+            recommendedValues = response.recommended_options;
+            showRecommendedValues(response);
+            showToast(I18n.t('add.recommend_success'), 'success');
+        } else {
+            showToast(I18n.t('add.recommend_failed'), 'error');
+        }
+    } catch (error) {
+        const errorMsg = `${I18n.t('add.recommend_failed_error')}: ${error.message}`;
+        showToast(errorMsg, 'error');
+    } finally {
+        if (recommendButton) {
+            recommendButton.disabled = false;
+            recommendButton.textContent = I18n.t('add.recommend_parameters');
+        }
+    }
+}
+
+function showRecommendedValues(response) {
+    const options = response.recommended_options || {};
+    const reasoning = response.reasoning || '';
+    
+    // Map parameter names
+    const paramMap = {
+        smooth: { key: 'smooth_window_frames', element: 'recommended-smooth', button: 'btn-apply-smooth' },
+        prominence: { key: 'prominence_ratio', element: 'recommended-prominence', button: 'btn-apply-prominence' },
+        minProminence: { key: 'min_prominence', element: 'recommended-min-prominence', button: 'btn-apply-min-prominence' },
+        maxSlope: { key: 'max_slope', element: 'recommended-max-slope', button: 'btn-apply-max-slope' },
+        boostSlope: { key: 'boost_slope', element: 'recommended-boost-slope', button: 'btn-apply-boost-slope' },
+        minSlope: { key: 'min_slope', element: 'recommended-min-slope', button: 'btn-apply-min-slope' },
+        merge: { key: 'merge_threshold_ms', element: 'recommended-merge', button: 'btn-apply-merge' },
+        fftFrames: { key: 'fft_frames_per_component', element: 'recommended-fft-frames', button: 'btn-apply-fft-frames' },
+    };
+    
+    let hasRecommendations = false;
+    for (const [paramKey, config] of Object.entries(paramMap)) {
+        const value = options[config.key];
+        if (value !== undefined && value !== null) {
+            hasRecommendations = true;
+            const valueElement = document.getElementById(config.element);
+            const buttonElement = document.getElementById(config.button);
+            
+            if (valueElement) {
+                valueElement.textContent = `${I18n.t('add.recommend_value')}: ${value}`;
+                valueElement.style.display = 'inline';
+            }
+            if (buttonElement) {
+                buttonElement.style.display = 'inline-block';
+                // Apply i18n to button text if it has data-i18n attribute
+                if (buttonElement.dataset.i18n) {
+                    buttonElement.textContent = I18n.t(buttonElement.dataset.i18n);
+                }
+            }
+        }
+    }
+    
+    // Show "Apply All" button if there are recommendations
+    const applyAllButton = document.getElementById('btn-apply-all-recommend');
+    if (applyAllButton) {
+        if (hasRecommendations) {
+            applyAllButton.style.display = 'inline-block';
+            if (applyAllButton.dataset.i18n) {
+                applyAllButton.textContent = I18n.t(applyAllButton.dataset.i18n);
+            }
+        } else {
+            applyAllButton.style.display = 'none';
+        }
+    }
+    
+    // Show reasoning if available
+    if (reasoning) {
+        console.log('Recommendation reasoning:', reasoning);
+    }
+}
+
+function getElementIdForParam(paramKey) {
+    // Map paramKey to actual HTML element ID
+    const idMap = {
+        smooth: 'smooth',
+        prominence: 'prominence',
+        minProminence: 'min-prominence',
+        maxSlope: 'max-slope',
+        boostSlope: 'boost-slope',
+        minSlope: 'min-slope',
+        merge: 'merge',
+        fftFrames: 'fft-frames',
+    };
+    return idMap[paramKey] || paramKey;
+}
+
+function applyRecommendedValue(paramKey) {
+    const paramMap = {
+        smooth: { key: 'smooth_window_frames', input: optionInputs.smooth },
+        prominence: { key: 'prominence_ratio', input: optionInputs.prominence },
+        minProminence: { key: 'min_prominence', input: optionInputs.minProminence },
+        maxSlope: { key: 'max_slope', input: optionInputs.maxSlope },
+        boostSlope: { key: 'boost_slope', input: optionInputs.boostSlope },
+        minSlope: { key: 'min_slope', input: optionInputs.minSlope },
+        merge: { key: 'merge_threshold_ms', input: optionInputs.merge },
+        fftFrames: { key: 'fft_frames_per_component', input: optionInputs.fftFrames },
+    };
+    
+    const config = paramMap[paramKey];
+    if (!config || !recommendedValues[config.key]) {
+        return;
+    }
+    
+    const value = recommendedValues[config.key];
+    if (config.input) {
+        if (config.input.type === 'number') {
+            config.input.value = value;
+        } else if (config.input.type === 'checkbox') {
+            config.input.checked = Boolean(value);
+        }
+        markDirty(config.input);
+    }
+    
+    // Hide the recommendation UI for this parameter
+    const elementId = getElementIdForParam(paramKey);
+    const valueElement = document.getElementById(`recommended-${elementId}`);
+    const buttonElement = document.getElementById(`btn-apply-${elementId}`);
+    
+    if (valueElement) {
+        valueElement.style.display = 'none';
+    }
+    if (buttonElement) {
+        buttonElement.style.display = 'none';
+    }
+    
+    showToast(`${I18n.t('add.applied_value')}: ${value}`, 'success');
+}
+
+function applyAllRecommendedValues() {
+    if (!recommendedValues || Object.keys(recommendedValues).length === 0) {
+        showToast(I18n.t('add.no_recommendations'), 'info');
+        return;
+    }
+    
+    const paramMap = {
+        smooth: { key: 'smooth_window_frames', input: optionInputs.smooth },
+        prominence: { key: 'prominence_ratio', input: optionInputs.prominence },
+        minProminence: { key: 'min_prominence', input: optionInputs.minProminence },
+        maxSlope: { key: 'max_slope', input: optionInputs.maxSlope },
+        boostSlope: { key: 'boost_slope', input: optionInputs.boostSlope },
+        minSlope: { key: 'min_slope', input: optionInputs.minSlope },
+        merge: { key: 'merge_threshold_ms', input: optionInputs.merge },
+        fftFrames: { key: 'fft_frames_per_component', input: optionInputs.fftFrames },
+    };
+    
+    let appliedCount = 0;
+    for (const [paramKey, config] of Object.entries(paramMap)) {
+        if (recommendedValues[config.key] !== undefined && recommendedValues[config.key] !== null) {
+            const value = recommendedValues[config.key];
+            if (config.input) {
+                if (config.input.type === 'number') {
+                    config.input.value = value;
+                } else if (config.input.type === 'checkbox') {
+                    config.input.checked = Boolean(value);
+                }
+                markDirty(config.input);
+            }
+            
+            // Hide the recommendation UI for this parameter
+            const elementId = getElementIdForParam(paramKey);
+            const valueElement = document.getElementById(`recommended-${elementId}`);
+            const buttonElement = document.getElementById(`btn-apply-${elementId}`);
+            
+            if (valueElement) {
+                valueElement.style.display = 'none';
+            }
+            if (buttonElement) {
+                buttonElement.style.display = 'none';
+            }
+            
+            appliedCount++;
+        }
+    }
+    
+    if (appliedCount > 0) {
+        const message = I18n.t('add.applied_all_values').replace('{count}', appliedCount);
+        showToast(message, 'success');
+    } else {
+        showToast(I18n.t('add.no_recommendations'), 'info');
+    }
+}
+
+function attachRecommendButton() {
+    ensureElements();
+    if (recommendButton && !recommendButton.dataset.recommendBound) {
+        recommendButton.addEventListener('click', recommendParameters);
+        recommendButton.dataset.recommendBound = '1';
+    }
+    
+    // Attach apply all button
+    const applyAllButton = document.getElementById('btn-apply-all-recommend');
+    if (applyAllButton && !applyAllButton.dataset.applyAllBound) {
+        applyAllButton.addEventListener('click', applyAllRecommendedValues);
+        applyAllButton.dataset.applyAllBound = '1';
+        // Apply i18n to button text
+        if (applyAllButton.dataset.i18n) {
+            applyAllButton.textContent = I18n.t(applyAllButton.dataset.i18n);
+        }
+    }
+    
+    // Attach apply buttons and apply i18n
+    document.querySelectorAll('.btn-apply-recommend').forEach((button) => {
+        if (button.dataset.applyBound) return;
+        button.addEventListener('click', (e) => {
+            const paramKey = e.target.dataset.param;
+            if (paramKey) {
+                applyRecommendedValue(paramKey);
+            }
+        });
+        button.dataset.applyBound = '1';
+        // Apply i18n to button text
+        if (button.dataset.i18n) {
+            button.textContent = I18n.t(button.dataset.i18n);
+        }
+    });
+    
+    // Apply i18n to recommend button
+    if (recommendButton && recommendButton.dataset.i18n) {
+        recommendButton.textContent = I18n.t(recommendButton.dataset.i18n);
+    }
+}
+
 export const AddView = {
     init() {
         ensureElements();
@@ -573,6 +832,7 @@ export const AddView = {
         attachFilePickers();
         attachManualPathInput();
         attachDropZone();
+        attachRecommendButton();
         addButton?.addEventListener('click', enqueueFiles);
         subscribeState();
         renderModels(State.get('models') || []);
@@ -580,7 +840,10 @@ export const AddView = {
         renderStagedItems();
     },
     show() {
-        // no-op
+        // Re-attach recommend button when view is shown
+        attachRecommendButton();
+        // Re-apply i18n when view is shown
+        I18n.apply();
     },
 };
 

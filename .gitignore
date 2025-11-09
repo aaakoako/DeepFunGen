@@ -40,6 +40,15 @@ DeepFunGen-*.zip
 DeepFunGen-*.7z
 *.spec
 
+# C# build artifacts
+DeepFunGen/bin/
+DeepFunGen/obj/
+
+# Test scripts output (保留脚本，但忽略输出)
+*_test_results/
+*_comparison_report.md
+*_results.json
+
 # Logs
 *.log
 
@@ -47,3 +56,7 @@ DeepFunGen-*.7z
 *.tmp
 *.bak
 
+# Perforce
+.p4config
+
+.fake

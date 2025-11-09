@@ -49,10 +49,10 @@ function formatOptions(options) {
     }
     const safe = options;
     const parts = [
-        `Smooth ${safe.smooth_window_frames ?? '-'}`,
-        `Prom ${formatDecimal(safe.prominence_ratio ?? 0)}`,
-        `Merge ${formatDecimal(safe.merge_threshold_ms ?? 0, 0)}ms`,
-        `FFT ${(safe.fft_denoise ? 'on' : 'off')}@${safe.fft_frames_per_component ?? '-'}`,
+        `${I18n.t('queue.options.smooth')} ${safe.smooth_window_frames ?? '-'}`,
+        `${I18n.t('queue.options.prom')} ${formatDecimal(safe.prominence_ratio ?? 0)}`,
+        `${I18n.t('queue.options.merge')} ${formatDecimal(safe.merge_threshold_ms ?? 0, 0)}ms`,
+        `${I18n.t('queue.options.fft')} ${(safe.fft_denoise ? I18n.t('queue.options.on') : I18n.t('queue.options.off'))}@${safe.fft_frames_per_component ?? '-'}`,
     ];
     const label = parts.join(' · ');
     const tooltip = JSON.stringify(safe, null, 2);
@@ -185,7 +185,9 @@ function renderQueue(queue) {
         const videoCell = document.createElement('td');
         videoCell.textContent = job.video_name || job.video_path;
         const statusCell = document.createElement('td');
-        statusCell.textContent = job.status;
+        const statusKey = `queue.status.${String(job.status).toLowerCase()}`;
+        const statusText = I18n.t(statusKey);
+        statusCell.textContent = statusText !== statusKey ? statusText : job.status;
         if (job.message) {
             statusCell.setAttribute('title', job.message);
         }

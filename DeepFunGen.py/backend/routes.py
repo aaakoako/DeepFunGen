@@ -24,11 +24,16 @@ from .models import (
     JobSummary,
     SettingsModel,
     PostprocessOptionsModel,
+    ParameterRecommendationRequest,
+    ParameterRecommendationResponse,
 )
 from .storage import SettingsManager, StateRepository
 from .telemetry import TelemetryCollector
 from .postprocess import run_postprocess
 from .worker import ProcessingWorker
+from .onnx_runner import OnnxSequenceModel
+from .video_pipeline import quick_predict_for_recommendation, resolve_prediction_path
+from .parameter_recommender import recommend_parameters
 
 SUPPORTED_VIDEO_EXTENSIONS = {
     ".mp4",
@@ -404,6 +409,81 @@ async def stream_logs(logs: LogBroker = Depends(_get_logs)) -> StreamingResponse
             return
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+# ---------------------------------------------------------------------------
+# Parameter recommendation
+# ---------------------------------------------------------------------------
+
+@router.post("/recommend-parameters", response_model=ParameterRecommendationResponse)
+async def recommend_parameters_endpoint(
+    payload: ParameterRecommendationRequest,
+    settings_manager: SettingsManager = Depends(_get_settings_manager),
+) -> ParameterRecommendationResponse:
+    """
+    Recommend post-processing parameters based on video signal analysis.
+    
+    Args:
+        video_path: Path to video file
+        model_path: Optional path to ONNX model (uses default if not provided)
+        
+    Returns:
+        ParameterRecommendationResponse with recommended options, features, and reasoning
+    """
+    video_file = Path(payload.video_path)
+    if not video_file.exists() or not video_file.is_file():
+        raise HTTPException(status_code=404, detail=f"Video file not found: {payload.video_path}")
+    
+    if video_file.suffix.lower() not in SUPPORTED_VIDEO_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Unsupported video format")
+    
+    # Determine model path
+    default_model = settings_manager.current().default_model_path
+    target_model_path = payload.model_path or default_model
+    if not target_model_path:
+        raise HTTPException(status_code=400, detail="No model specified and no default model available")
+    
+    model_file = Path(target_model_path)
+    if not model_file.exists():
+        raise HTTPException(status_code=404, detail=f"Model file not found: {target_model_path}")
+    
+    # Check if CSV prediction file already exists
+    prediction_path = resolve_prediction_path(video_file, model_file)
+    df = None
+    
+    if prediction_path.exists():
+        try:
+            df = pd.read_csv(prediction_path)
+            logger.info(f"Using existing prediction file: {prediction_path}")
+        except Exception as exc:
+            logger.warning(f"Failed to read existing prediction file: {exc}")
+    
+    # If no CSV exists, perform quick prediction
+    if df is None or len(df) == 0:
+        try:
+            model = OnnxSequenceModel(model_file, prefer_gpu=True)
+            df = await run_in_threadpool(quick_predict_for_recommendation, video_file, model)
+            logger.info(f"Quick prediction completed: {len(df)} frames")
+        except Exception as exc:
+            logger.error(f"Quick prediction failed: {exc}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Failed to analyze video: {str(exc)}") from exc
+    
+    # Ensure required column exists
+    if "predicted_change" not in df.columns:
+        raise HTTPException(status_code=500, detail="Prediction data missing 'predicted_change' column")
+    
+    # Get recommendations
+    try:
+        recommended, features, reasoning = await run_in_threadpool(recommend_parameters, df)
+    except Exception as exc:
+        logger.error(f"Parameter recommendation failed: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {str(exc)}") from exc
+    
+    return ParameterRecommendationResponse(
+        recommended_options=recommended,
+        features=features,
+        reasoning=reasoning,
+    )
 
 
 __all__ = ["router", "SUPPORTED_VIDEO_EXTENSIONS"]

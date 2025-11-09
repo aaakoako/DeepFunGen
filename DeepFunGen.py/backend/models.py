@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -104,6 +104,21 @@ class LogEvent(BaseModel):
     message: str
 
 
+class ParameterRecommendationRequest(BaseModel):
+    """Request model for parameter recommendation API."""
+
+    video_path: str
+    model_path: Optional[str] = None
+
+
+class ParameterRecommendationResponse(BaseModel):
+    """Response model for parameter recommendation API."""
+
+    recommended_options: PostprocessOptionsModel
+    features: Dict[str, float]
+    reasoning: str
+
+
 __all__ = [
     "JobStatus",
     "PostprocessOptionsModel",
@@ -113,4 +128,6 @@ __all__ = [
     "SettingsModel",
     "SystemStatusModel",
     "LogEvent",
+    "ParameterRecommendationRequest",
+    "ParameterRecommendationResponse",
 ]
