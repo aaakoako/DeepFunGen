@@ -8,6 +8,7 @@ __pycache__/
 dist/
 build/
 *.egg
+*.pyc
 
 # Virtual environments
 venv/
@@ -26,16 +27,13 @@ ENV/
 Thumbs.db
 
 # Project specific
-DeepFunGen.py/backend/__pycache__/
-DeepFunGen.py/state/
+app.py/backend/__pycache__/
+app.py/state/
 *.zip
 *.7z
 *.rar
 
 # Release files (不要提交打包好的release文件)
-dist/
-build/
-*.exe
 DeepFunGen-*.zip
 DeepFunGen-*.7z
 *.spec
@@ -43,6 +41,12 @@ DeepFunGen-*.7z
 # C# build artifacts
 DeepFunGen/bin/
 DeepFunGen/obj/
+app/obj/
+app/bin/
+app/.vs/
+app2/DeepFunGen.Wpf/obj/
+app2/DeepFunGen.Wpf/bin/
+app2/DeepFunGen.Wpf/.vs/
 
 # Test scripts (本地测试脚本，不提交)
 full_pipeline_test.py
@@ -66,3 +70,22 @@ analyze_motion_vs_bgm.py
 .p4config
 
 .fake
+
+# Upstream additions
+.pytest_cache
+data_vr/
+data_vr2/
+models/
+models2/
+models3/
+models4/
+configs/_sweeps/
+configs/old/
+mlruns/
+scripts/__pycache__/
+scripts2/__pycache__/
+scripts3/__pycache__/
+scripts4/__pycache__/
+**/__pycache__/*
+app.py/dist/
+rnd/
