@@ -21,6 +21,7 @@
                         <div class="dropzone__message" data-i18n="add.drop_message">Drop videos here</div>
                         <div class="dropzone__buttons">
                             <button class="button" id="btn-browse-files" data-i18n="add.browse_files">Browse Files</button>
+                            <button class="button button--secondary" id="btn-recommend-parameters" data-i18n="add.recommend_parameters">智能推荐</button>
                         </div>
                     </div>
                 </div>
@@ -36,6 +37,16 @@
                             <span class="text-muted small" data-i18n="queue.manual_hint">Use when file dialogs cannot expose the original path.</span>
                         </label>
                     </div>
+                </div>
+            </div>
+            <div class="param-recommendation-panel" id="param-recommendation-panel" style="display: none; margin-top: var(--spacing-md);">
+                <div class="param-recommendation-header">
+                    <h3 class="param-recommendation-title" data-i18n="param.recommendation.title">推荐理由</h3>
+                    <button class="button button--ghost button--small" id="btn-toggle-recommendation-details" data-i18n="param.recommendation.show_details">查看详情</button>
+                </div>
+                <div class="param-recommendation-content" id="param-recommendation-content">
+                    <div class="param-recommendation-reasoning" id="param-recommendation-reasoning"></div>
+                    <div class="param-explanation-grid" id="param-explanation-grid" style="display: none;"></div>
                 </div>
             </div>
         </div>

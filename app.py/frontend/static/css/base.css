@@ -958,6 +958,88 @@ textarea {
     gap: var(--spacing-sm);
 }
 
+/* Parameter recommendation panel styles */
+.param-recommendation-panel {
+    background: var(--surface-800);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.param-recommendation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+}
+
+.param-recommendation-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-100);
+    margin: 0;
+}
+
+.button--small {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+}
+
+.param-recommendation-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.param-recommendation-reasoning {
+    color: var(--text-200);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+}
+
+.param-explanation-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--spacing-sm);
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.param-explanation-item {
+    background: var(--surface-700);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.param-explanation-item__name {
+    font-weight: 600;
+    color: var(--accent-500);
+    font-size: 0.85rem;
+}
+
+.param-explanation-item__description {
+    color: var(--text-200);
+    font-size: 0.8rem;
+    line-height: 1.5;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.dropzone__buttons {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
 @media (max-width: 1280px) {
     .pane__content {
         grid-template-columns: 1fr;

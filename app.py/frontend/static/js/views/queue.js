@@ -29,6 +29,13 @@ let modelFilterToggle;
 let modelFilterVrOnly = false;
 let enqueueBusy = false;
 let refreshTimer = null;
+let recommendButton;
+let recommendationPanel;
+let recommendationReasoning;
+let explanationGrid;
+let toggleDetailsButton;
+let recommendationDetailsVisible = false;
+let currentRecommendation = null;
 
 function ensureElements() {
     if (!queueTableBody) queueTableBody = document.querySelector('#queue-table tbody');
@@ -40,6 +47,11 @@ function ensureElements() {
     if (!manualPathButton) manualPathButton = document.getElementById('btn-add-manual-path');
     if (!modelSelect) modelSelect = document.getElementById('model-select');
     if (!modelFilterToggle) modelFilterToggle = document.getElementById('model-filter-vr');
+    if (!recommendButton) recommendButton = document.getElementById('btn-recommend-parameters');
+    if (!recommendationPanel) recommendationPanel = document.getElementById('param-recommendation-panel');
+    if (!recommendationReasoning) recommendationReasoning = document.getElementById('param-recommendation-reasoning');
+    if (!explanationGrid) explanationGrid = document.getElementById('param-explanation-grid');
+    if (!toggleDetailsButton) toggleDetailsButton = document.getElementById('btn-toggle-recommendation-details');
 }
 
 function toast(key, fallback, type = 'success', count) {
@@ -727,6 +739,223 @@ function handleActiveView(view) {
     }
 }
 
+// Parameter recommendation functions
+const PARAM_EXPLANATIONS = {
+    smooth_window_frames: 'param.explanation.smooth_window',
+    prominence_ratio: 'param.explanation.prominence_ratio',
+    min_prominence: 'param.explanation.min_prominence',
+    max_slope: 'param.explanation.max_slope',
+    boost_slope: 'param.explanation.boost_slope',
+    min_slope: 'param.explanation.min_slope',
+    merge_threshold_ms: 'param.explanation.merge_threshold',
+    fft_denoise: 'param.explanation.fft_denoise',
+    fft_frames_per_component: 'param.explanation.fft_frames',
+};
+
+const PARAM_LABELS = {
+    smooth_window_frames: 'add.opt_smooth',
+    prominence_ratio: 'add.opt_prominence',
+    min_prominence: 'add.opt_min_prominence',
+    max_slope: 'add.opt_max_slope',
+    boost_slope: 'add.opt_boost_slope',
+    min_slope: 'add.opt_min_slope',
+    merge_threshold_ms: 'add.opt_merge',
+    fft_denoise: 'add.opt_fft_denoise',
+    fft_frames_per_component: 'add.opt_fft_frames',
+};
+
+const PARAM_DISPLAY_NAMES = {
+    smooth_window_frames: '平滑窗口',
+    prominence_ratio: '突出度比率',
+    min_prominence: '最小突出度',
+    max_slope: '最大斜率',
+    boost_slope: '增强斜率',
+    min_slope: '最小斜率',
+    merge_threshold_ms: '合并阈值',
+    fft_denoise: 'FFT降噪',
+    fft_frames_per_component: 'FFT帧数',
+};
+
+function renderParameterExplanations(recommended) {
+    ensureElements();
+    if (!explanationGrid) return;
+    
+    explanationGrid.innerHTML = '';
+    
+    const lang = State.get('language') || 'en';
+    const isZh = lang === 'zh';
+    
+    // Only show explanations for Chinese users
+    if (!isZh) {
+        return;
+    }
+    
+    Object.keys(PARAM_EXPLANATIONS).forEach((paramKey) => {
+        const value = recommended[paramKey];
+        if (value === undefined || value === null) return;
+        
+        const item = document.createElement('div');
+        item.className = 'param-explanation-item';
+        
+        const name = document.createElement('div');
+        name.className = 'param-explanation-item__name';
+        const labelKey = PARAM_LABELS[paramKey] || paramKey;
+        const displayName = PARAM_DISPLAY_NAMES[paramKey] || I18n.t(labelKey);
+        const formattedValue = paramKey === 'fft_denoise' 
+            ? (value ? '开启' : '关闭')
+            : formatDecimal(value, paramKey === 'merge_threshold_ms' ? 0 : 2);
+        name.textContent = `${displayName}: ${formattedValue}`;
+        
+        const description = document.createElement('div');
+        description.className = 'param-explanation-item__description';
+        description.textContent = I18n.t(PARAM_EXPLANATIONS[paramKey]);
+        
+        item.appendChild(name);
+        item.appendChild(description);
+        explanationGrid.appendChild(item);
+    });
+}
+
+function renderRecommendationReasoning(reasoning) {
+    ensureElements();
+    if (!recommendationReasoning) return;
+    
+    const lang = State.get('language') || 'en';
+    const isZh = lang === 'zh';
+    
+    if (!reasoning || !reasoning.trim()) {
+        recommendationReasoning.textContent = I18n.t('param.recommendation.no_reasoning');
+        return;
+    }
+    
+    // For Chinese, show the reasoning directly
+    // For other languages, show a translated version if available
+    if (isZh) {
+        recommendationReasoning.textContent = reasoning;
+    } else {
+        // Try to translate or show original
+        recommendationReasoning.textContent = reasoning;
+    }
+}
+
+function toggleRecommendationDetails() {
+    ensureElements();
+    if (!explanationGrid || !toggleDetailsButton) return;
+    
+    recommendationDetailsVisible = !recommendationDetailsVisible;
+    
+    if (recommendationDetailsVisible) {
+        explanationGrid.style.display = 'grid';
+        toggleDetailsButton.textContent = I18n.t('param.recommendation.hide_details');
+    } else {
+        explanationGrid.style.display = 'none';
+        toggleDetailsButton.textContent = I18n.t('param.recommendation.show_details');
+    }
+}
+
+function showRecommendationPanel(recommendation) {
+    ensureElements();
+    if (!recommendationPanel) return;
+    
+    currentRecommendation = recommendation;
+    recommendationPanel.style.display = 'block';
+    
+    if (recommendation?.reasoning) {
+        renderRecommendationReasoning(recommendation.reasoning);
+    }
+    
+    if (recommendation?.recommended_options) {
+        renderParameterExplanations(recommendation.recommended_options);
+    }
+    
+    // Only show details toggle for Chinese users
+    const lang = State.get('language') || 'en';
+    if (lang === 'zh' && toggleDetailsButton) {
+        toggleDetailsButton.style.display = 'block';
+        recommendationDetailsVisible = false;
+        explanationGrid.style.display = 'none';
+        toggleDetailsButton.textContent = I18n.t('param.recommendation.show_details');
+    } else if (toggleDetailsButton) {
+        toggleDetailsButton.style.display = 'none';
+    }
+}
+
+function hideRecommendationPanel() {
+    ensureElements();
+    if (!recommendationPanel) return;
+    
+    recommendationPanel.style.display = 'none';
+    currentRecommendation = null;
+}
+
+async function recommendParameters() {
+    ensureElements();
+    if (!recommendButton) return;
+    
+    // Get first completed job from queue
+    const queue = State.get('queue') || [];
+    const completedJobs = queue.filter(job => 
+        job.status === 'completed' && job.prediction_path
+    );
+    
+    if (completedJobs.length === 0) {
+        showToast(I18n.t('add.recommend_no_video'), 'error');
+        return;
+    }
+    
+    const modelPath = getSelectedModelPath();
+    if (!modelPath) {
+        showToast(I18n.t('add.recommend_no_model'), 'error');
+        return;
+    }
+    
+    // Use the first completed job
+    const job = completedJobs[0];
+    
+    recommendButton.disabled = true;
+    recommendButton.textContent = I18n.t('add.recommend_analyzing');
+    
+    try {
+        const response = await Api.post('/api/recommend-parameters', {
+            video_path: job.video_path,
+            model_path: modelPath,
+        });
+        
+        if (response?.recommended_options && response?.reasoning) {
+            showRecommendationPanel({
+                recommended_options: response.recommended_options,
+                reasoning: response.reasoning,
+                features: response.features,
+            });
+            showToast(I18n.t('add.recommend_success'), 'success');
+        } else {
+            showToast(I18n.t('add.recommend_failed'), 'error');
+        }
+    } catch (error) {
+        showToast(I18n.t('add.recommend_failed_error') + ': ' + (error.message || ''), 'error');
+    } finally {
+        recommendButton.disabled = false;
+        recommendButton.textContent = I18n.t('add.recommend_parameters');
+        I18n.apply();
+    }
+}
+
+function attachRecommendButton() {
+    ensureElements();
+    if (!recommendButton || recommendButton.dataset.bound) return;
+    
+    recommendButton.addEventListener('click', recommendParameters);
+    recommendButton.dataset.bound = '1';
+}
+
+function attachToggleDetailsButton() {
+    ensureElements();
+    if (!toggleDetailsButton || toggleDetailsButton.dataset.bound) return;
+    
+    toggleDetailsButton.addEventListener('click', toggleRecommendationDetails);
+    toggleDetailsButton.dataset.bound = '1';
+}
+
 export const QueueView = {
     init() {
         ensureElements();
@@ -736,10 +965,18 @@ export const QueueView = {
         attachFilePickers();
         attachManualPathInput();
         attachDropZone();
+        attachRecommendButton();
+        attachToggleDetailsButton();
         renderQueue(State.get('queue') || []);
         renderModels(State.get('models') || []);
         subscribeState();
         State.subscribe('activeView', handleActiveView);
+        State.subscribe('language', () => {
+            if (currentRecommendation) {
+                showRecommendationPanel(currentRecommendation);
+            }
+            I18n.apply();
+        });
         if (State.get('activeView') === 'queue') {
             startAutoRefresh();
         }
